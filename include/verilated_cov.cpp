@@ -63,6 +63,7 @@ public:  // But only local to this file
     virtual ~VerilatedCovImpItem() = default;
     virtual uint64_t count() const = 0;
     virtual void zero() const = 0;
+    virtual void* counterPointer() const = 0;  // Get pointer to counter
 };
 
 //=============================================================================
@@ -81,6 +82,7 @@ public:
     // cppcheck-suppress truncLongCastReturn
     uint64_t count() const override { return *m_countp; }
     void zero() const override { *m_countp = 0; }
+    void* counterPointer() const override { return static_cast<void*>(m_countp); }
     // CONSTRUCTORS
     // cppcheck-suppress noExplicitConstructor
     explicit VerilatedCoverItemSpec(T* countp)
@@ -292,6 +294,44 @@ public:
         for (const VerilatedCovImpItem* const itemp : m_items) itemp->zero();
     }
 
+    // cppcheck-suppress duplInheritedMember
+    std::vector<VerilatedCovCounterInfo> getCounters() VL_MT_SAFE_EXCLUDES(m_mutex) {
+        Verilated::quiesce();
+        const VerilatedLockGuard lock{m_mutex};
+        std::vector<VerilatedCovCounterInfo> result;
+        result.reserve(m_items.size());
+
+        for (const auto& itemp : m_items) {
+            VerilatedCovCounterInfo info;
+            info.counterp = itemp->counterPointer();
+            info.count = itemp->count();
+
+            // Extract metadata from keys/vals
+            for (int i = 0; i < VerilatedCovConst::MAX_KEYS; ++i) {
+                if (itemp->m_keys[i] != VerilatedCovConst::KEY_UNDEF) {
+                    const std::string key = m_indexValues.at(itemp->m_keys[i]);
+                    const std::string val = m_indexValues.at(itemp->m_vals[i]);
+
+                    if (key == "filename" || key == VL_CIK_FILENAME) {
+                        info.filename = val;
+                    } else if (key == "lineno" || key == VL_CIK_LINENO) {
+                        info.lineno = std::atoi(val.c_str());
+                    } else if (key == "hier" || key == VL_CIK_HIER) {
+                        info.hier = val;
+                    } else if (key == "type" || key == VL_CIK_TYPE) {
+                        info.type = val;
+                    } else if (key == "comment" || key == VL_CIK_COMMENT) {
+                        info.comment = val;
+                    }
+                }
+            }
+
+            result.push_back(info);
+        }
+
+        return result;
+    }
+
     // We assume there's always call to i/f/p in that order
     void inserti(VerilatedCovImpItem* itemp) VL_MT_SAFE_EXCLUDES(m_mutex) {
         const VerilatedLockGuard lock{m_mutex};
@@ -450,6 +490,9 @@ void VerilatedCovContext::clearNonMatch(const char* matchp) VL_MT_SAFE {
     impp()->clearNonMatch(matchp);
 }
 void VerilatedCovContext::zero() VL_MT_SAFE { impp()->zero(); }
+std::vector<VerilatedCovCounterInfo> VerilatedCovContext::getCounters() VL_MT_SAFE {
+    return impp()->getCounters();
+}
 void VerilatedCovContext::write(const std::string& filename) VL_MT_SAFE {
     impp()->write(filename);
 }
