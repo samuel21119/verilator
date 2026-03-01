@@ -32,8 +32,22 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 class VerilatedCovImp;
+
+//=============================================================================
+/// Coverage counter information structure
+/// This structure provides direct access to coverage counters and their metadata
+struct VerilatedCovCounterInfo final {
+    void* counterp;  ///< Pointer to the coverage counter (uint32_t* or uint64_t*)
+    std::string filename;  ///< Filename for this coverage point
+    int lineno;  ///< Line number for this coverage point
+    std::string hier;  ///< Hierarchical name
+    std::string type;  ///< Coverage type (block, line, fsm, toggle, user, etc.)
+    std::string comment;  ///< Comment/description
+    uint64_t count;  ///< Current count value
+};
 
 //=============================================================================
 /// Insert an item for coverage analysis.
@@ -165,6 +179,9 @@ public:
     void clearNonMatch(const char* matchp) VL_MT_SAFE;
     /// Zero coverage points
     void zero() VL_MT_SAFE;
+    /// Get all coverage counters information
+    /// Returns a vector of VerilatedCovCounterInfo with pointers to counters and metadata
+    std::vector<VerilatedCovCounterInfo> getCounters() VL_MT_SAFE;
 
     // METHODS - public but Internal use only
 

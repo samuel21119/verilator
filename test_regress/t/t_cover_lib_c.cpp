@@ -63,6 +63,25 @@ int main() {
     coverw[4] = 200;
     coverw[5] = 300;
 
+    // Test the new getCounters API
+    std::vector<VerilatedCovCounterInfo> counters = covContextp->getCounters();
+    TEST_CHECK_EQ(counters.size(), 6);
+
+    // Verify counter values can be accessed directly
+    for (const auto& counter : counters) {
+        if (counter.comment == "kept_one") {
+            TEST_CHECK_EQ(counter.count, 100);
+            TEST_CHECK_NE(counter.counterp, nullptr);
+            // Verify we can read the value through the pointer
+            uint32_t* ptr = static_cast<uint32_t*>(counter.counterp);
+            TEST_CHECK_EQ(*ptr, 100);
+        } else if (counter.comment == "kept_two") {
+            TEST_CHECK_EQ(counter.count, 210);
+            uint64_t* ptr = static_cast<uint64_t*>(counter.counterp);
+            TEST_CHECK_EQ(*ptr, 210);
+        }
+    }
+
 #ifdef T_COVER_LIB
     TEST_CHECK_EQ(covContextp->defaultFilename(), "coverage.dat");
     covContextp->write(VL_STRINGIFY(TEST_OBJ_DIR) "/coverage1.dat");
